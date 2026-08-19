@@ -1,5 +1,6 @@
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
+import { router, useRootNavigationState } from "expo-router";
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 
@@ -92,6 +93,11 @@ async function registerForPushNotificationsAsync() {
 }
 
 export const usePushNotifications = () => {
+
+  const [pendingChartId, setPendingChartId] = useState<string | null>('')
+  //para saber cuando la app ya este montada
+  const rootNavigationState = useRootNavigationState()
+
   const [expoPushToken, setExpoPushToken] = useState("");
   const [notifications, setNotifications] = useState<
     Notifications.Notification[]
@@ -115,17 +121,40 @@ export const usePushNotifications = () => {
 
     const responseListener =
       Notifications.addNotificationResponseReceivedListener((response) => {
-        console.log("addNotificationResponseReceivedListener:");
-        console.log(response);
+        const chatId = response.notification.request.content.data?.chatId
+        if (typeof chatId === 'string' && chatId.length > 0) {
+          setPendingChartId(chatId)
+        }
+
       });
 
-    //TODO implementar funcion cuando la app esta terminada
+    const handleInitialNotificationResponse = () => {
+      const response = Notifications.getLastNotificationResponse();
+
+      const chatId = response?.notification?.request?.content?.data?.chatId
+
+      if (typeof chatId === 'string' && chatId.length > 0) {
+        setPendingChartId(chatId)
+      }
+    }
+
+    handleInitialNotificationResponse()
 
     return () => {
       notificationListener.remove();
       responseListener.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (!rootNavigationState?.key) return
+    if (!pendingChartId) return
+
+    router.push(`/chat/${pendingChartId}` as any)
+    setPendingChartId(null)
+
+
+  }, [rootNavigationState?.key, pendingChartId])
 
   return {
     // Props
